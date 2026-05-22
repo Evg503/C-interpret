@@ -1,12 +1,12 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include <stdbool.h>
-
 #include "lexer.h"
 
-Keyword keywords[] = {
+// Ключевые слова
+typedef struct {
+    const char* word;
+    TokenType type;
+} Keyword;
+
+static Keyword keywords[] = {
     {"if", TOKEN_IF},
     {"else", TOKEN_ELSE},
     {"while", TOKEN_WHILE},
@@ -21,7 +21,6 @@ Keyword keywords[] = {
     {NULL, TOKEN_EOF}
 };
 
-// Инициализация лексера
 void init_lexer(Lexer* lexer, const char* source) {
     lexer->source = source;
     lexer->pos = 0;
@@ -29,7 +28,7 @@ void init_lexer(Lexer* lexer, const char* source) {
     lexer->col = 1;
 }
 
-void skip_whitespace(Lexer* lexer) {
+static void skip_whitespace(Lexer* lexer) {
     while (lexer->source[lexer->pos]) {
         char c = lexer->source[lexer->pos];
         if (c == ' ' || c == '\t' || c == '\r') {
@@ -41,6 +40,7 @@ void skip_whitespace(Lexer* lexer) {
             lexer->col = 1;
         } else if (c == '/') {
             if (lexer->source[lexer->pos + 1] == '/') {
+                // Однострочный комментарий
                 while (lexer->source[lexer->pos] && lexer->source[lexer->pos] != '\n')
                     lexer->pos++;
             } else if (lexer->source[lexer->pos + 1] == '*') {
@@ -68,9 +68,7 @@ void skip_whitespace(Lexer* lexer) {
     }
 }
 
-
-// Чтение числа
-char* read_number(Lexer* lexer) {
+static char* read_number(Lexer* lexer) {
     int start = lexer->pos;
     while (isdigit(lexer->source[lexer->pos]))
         lexer->pos++;
@@ -84,8 +82,21 @@ char* read_number(Lexer* lexer) {
     return num;
 }
 
-// Чтение идентификатора или ключевого слова
-char* read_identifier(Lexer* lexer) {
+static char* read_string(Lexer* lexer) {
+    lexer->pos++; // пропускаем открывающую кавычку
+    int start = lexer->pos;
+    while (lexer->source[lexer->pos] && lexer->source[lexer->pos] != '"')
+        lexer->pos++;
+    int len = lexer->pos - start;
+    char* str = (char*)malloc(len + 1);
+    strncpy(str, lexer->source + start, len);
+    str[len] = '\0';
+    lexer->pos++; // пропускаем закрывающую кавычку
+    lexer->col += len + 2;
+    return str;
+}
+
+static char* read_identifier(Lexer* lexer) {
     int start = lexer->pos;
     while (isalnum(lexer->source[lexer->pos]) || lexer->source[lexer->pos] == '_')
         lexer->pos++;
@@ -99,7 +110,6 @@ char* read_identifier(Lexer* lexer) {
     return id;
 }
 
-// Получение следующего токена
 Token get_next_token(Lexer* lexer) {
     Token token;
     token.value = NULL;
@@ -124,17 +134,8 @@ Token get_next_token(Lexer* lexer) {
     
     // Строки
     if (c == '"') {
-        lexer->pos++;
-        int start = lexer->pos;
-        while (lexer->source[lexer->pos] && lexer->source[lexer->pos] != '"')
-            lexer->pos++;
-        int len = lexer->pos - start;
-        char* str = (char*)malloc(len + 1);
-        strncpy(str, lexer->source + start, len);
-        str[len] = '\0';
-        lexer->pos++;
         token.type = TOKEN_STRING;
-        token.value = str;
+        token.value = read_string(lexer);
         return token;
     }
     
@@ -142,6 +143,7 @@ Token get_next_token(Lexer* lexer) {
     if (isalpha(c) || c == '_') {
         char* id = read_identifier(lexer);
         
+        // Проверка на ключевое слово
         int i = 0;
         while (keywords[i].word != NULL) {
             if (strcmp(id, keywords[i].word) == 0) {
@@ -157,7 +159,7 @@ Token get_next_token(Lexer* lexer) {
         return token;
     }
     
-    // Операторы (многосимвольные проверяем первыми)
+    // Операторы
     lexer->pos++;
     lexer->col++;
     
@@ -180,15 +182,9 @@ Token get_next_token(Lexer* lexer) {
                 token.type = TOKEN_MINUS;
             }
             break;
-        case '*':
-            token.type = TOKEN_STAR;
-            break;
-        case '/':
-            token.type = TOKEN_SLASH;
-            break;
-        case '%':
-            token.type = TOKEN_PERCENT;
-            break;
+        case '*': token.type = TOKEN_STAR; break;
+        case '/': token.type = TOKEN_SLASH; break;
+        case '%': token.type = TOKEN_PERCENT; break;
         case '=':
             if (lexer->source[lexer->pos] == '=') {
                 lexer->pos++;
@@ -251,18 +247,10 @@ Token get_next_token(Lexer* lexer) {
                 token.type = TOKEN_BIT_OR;
             }
             break;
-        case '^':
-            token.type = TOKEN_BIT_XOR;
-            break;
-        case '~':
-            token.type = TOKEN_BIT_NOT;
-            break;
-        case '?':
-            token.type = TOKEN_OR; // Временно, нужно добавить TOKEN_QUESTION
-            break;
-        case ':':
-            token.type = TOKEN_ASSIGN; // Временно
-            break;
+        case '^': token.type = TOKEN_BIT_XOR; break;
+        case '~': token.type = TOKEN_BIT_NOT; break;
+        case '?': token.type = TOKEN_QUESTION; break;
+        case ':': token.type = TOKEN_COLON; break;
         case ';': token.type = TOKEN_SEMICOLON; break;
         case ',': token.type = TOKEN_COMMA; break;
         case '(': token.type = TOKEN_LPAREN; break;
@@ -279,34 +267,59 @@ Token get_next_token(Lexer* lexer) {
     return token;
 }
 
-// Печать токена (для отладки)
 void print_token(Token* token) {
     switch (token->type) {
         case TOKEN_EOF: printf("EOF"); break;
         case TOKEN_IDENTIFIER: printf("IDENTIFIER(%s)", token->value); break;
         case TOKEN_NUMBER: printf("NUMBER(%s)", token->value); break;
+        case TOKEN_STRING: printf("STRING(\"%s\")", token->value); break;
         case TOKEN_PLUS: printf("PLUS"); break;
         case TOKEN_MINUS: printf("MINUS"); break;
         case TOKEN_STAR: printf("STAR"); break;
         case TOKEN_SLASH: printf("SLASH"); break;
+        case TOKEN_PERCENT: printf("PERCENT"); break;
         case TOKEN_ASSIGN: printf("ASSIGN"); break;
+        case TOKEN_PLUS_PLUS: printf("PLUS_PLUS"); break;
+        case TOKEN_MINUS_MINUS: printf("MINUS_MINUS"); break;
+        case TOKEN_EQ: printf("EQ"); break;
+        case TOKEN_NEQ: printf("NEQ"); break;
+        case TOKEN_LT: printf("LT"); break;
+        case TOKEN_GT: printf("GT"); break;
+        case TOKEN_LE: printf("LE"); break;
+        case TOKEN_GE: printf("GE"); break;
+        case TOKEN_AND: printf("AND"); break;
+        case TOKEN_OR: printf("OR"); break;
+        case TOKEN_NOT: printf("NOT"); break;
+        case TOKEN_BIT_AND: printf("BIT_AND"); break;
+        case TOKEN_BIT_OR: printf("BIT_OR"); break;
+        case TOKEN_BIT_XOR: printf("BIT_XOR"); break;
+        case TOKEN_BIT_NOT: printf("BIT_NOT"); break;
+        case TOKEN_SHIFT_LEFT: printf("SHIFT_LEFT"); break;
+        case TOKEN_SHIFT_RIGHT: printf("SHIFT_RIGHT"); break;
         case TOKEN_SEMICOLON: printf("SEMICOLON"); break;
+        case TOKEN_COMMA: printf("COMMA"); break;
         case TOKEN_LPAREN: printf("LPAREN"); break;
         case TOKEN_RPAREN: printf("RPAREN"); break;
         case TOKEN_LBRACE: printf("LBRACE"); break;
         case TOKEN_RBRACE: printf("RBRACE"); break;
+        case TOKEN_LBRACKET: printf("LBRACKET"); break;
+        case TOKEN_RBRACKET: printf("RBRACKET"); break;
+        case TOKEN_QUESTION: printf("QUESTION"); break;
+        case TOKEN_COLON: printf("COLON"); break;
         case TOKEN_IF: printf("IF"); break;
         case TOKEN_ELSE: printf("ELSE"); break;
         case TOKEN_WHILE: printf("WHILE"); break;
+        case TOKEN_FOR: printf("FOR"); break;
         case TOKEN_RETURN: printf("RETURN"); break;
         case TOKEN_INT: printf("INT"); break;
-        case TOKEN_LT: printf("LT"); break;
-        case TOKEN_GT: printf("GT"); break;
-        case TOKEN_EQ: printf("EQ"); break;
-        case TOKEN_NEQ: printf("NEQ"); break;
-        case TOKEN_LE: printf("LE"); break;
-        case TOKEN_GE: printf("GE"); break;
         case TOKEN_PRINT: printf("PRINT"); break;
         default: printf("UNKNOWN");
+    }
+}
+
+void free_token(Token* token) {
+    if (token->value) {
+        free(token->value);
+        token->value = NULL;
     }
 }

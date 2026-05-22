@@ -1,6 +1,13 @@
-#pragma once
+#ifndef LEXER_H
+#define LEXER_H
 
-// Типы токенов (расширенные)
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <stdbool.h>
+
+// Типы токенов
 typedef enum {
     TOKEN_EOF = 0,
     TOKEN_IDENTIFIER,
@@ -47,6 +54,8 @@ typedef enum {
     TOKEN_RBRACE,       // }
     TOKEN_LBRACKET,     // [
     TOKEN_RBRACKET,     // ]
+    TOKEN_QUESTION,     // ?
+    TOKEN_COLON,        // :
     
     // Ключевые слова
     TOKEN_IF,
@@ -65,7 +74,7 @@ typedef enum {
 // Структура токена
 typedef struct {
     TokenType type;
-    char* value;     // для IDENTIFIER, NUMBER
+    char* value;
     int line;
     int column;
 } Token;
@@ -76,17 +85,12 @@ typedef struct {
     int pos;
     int line;
     int col;
-    Token current_token;
 } Lexer;
 
-// Ключевые слова
-typedef struct {
-    const char* word;
-    TokenType type;
-} Keyword;
-
-
-Token get_next_token(Lexer* lexer);
+// Функции лексера
 void init_lexer(Lexer* lexer, const char* source);
+Token get_next_token(Lexer* lexer);
 void print_token(Token* token);
+void free_token(Token* token);
 
+#endif // LEXER_H

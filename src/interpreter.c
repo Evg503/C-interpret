@@ -1,38 +1,121 @@
+#include "interpreter.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include <stdbool.h>
 
+#define MAX_SYMBOLS 256
 
-#include "lexer.h"
-#include "interpreter.h"
+static Symbol symbol_table[MAX_SYMBOLS];
+static int symbol_count = 0;
 
-Symbol sym_table[100];
-int sym_count = 0;
+void init_interpreter(void) {
+    symbol_count = 0;
+    memset(symbol_table, 0, sizeof(symbol_table));
+}
 
 int get_variable(const char* name) {
-    for (int i = 0; i < sym_count; i++) {
-        if (strcmp(sym_table[i].name, name) == 0)
-            return sym_table[i].value;
+    for (int i = 0; i < symbol_count; i++) {
+        if (strcmp(symbol_table[i].name, name) == 0) {
+            return symbol_table[i].value;
+        }
     }
     return 0;
 }
 
 void set_variable(const char* name, int value) {
-    for (int i = 0; i < sym_count; i++) {
-        if (strcmp(sym_table[i].name, name) == 0) {
-            sym_table[i].value = value;
+    for (int i = 0; i < symbol_count; i++) {
+        if (strcmp(symbol_table[i].name, name) == 0) {
+            symbol_table[i].value = value;
             return;
         }
     }
-    sym_table[sym_count].name = strdup(name);
-    sym_table[sym_count].value = value;
-    sym_count++;
+    
+    if (symbol_count < MAX_SYMBOLS) {
+        symbol_table[symbol_count].name = strdup(name);
+        symbol_table[symbol_count].value = value;
+        symbol_count++;
+    } else {
+        printf("Ошибка: слишком много переменных\n");
+    }
 }
 
-// Интерпретация AST
-int interpret_ast(ASTNode* node) {
+void print_symbol_table(void) {
+    for (int i = 0; i < symbol_count; i++) {
+        printf("  %s = %d\n", symbol_table[i].name, symbol_table[i].value);
+    }
+}
+
+static int interpret_expression(ASTNode* node);
+
+// Интерпретация оператора
+static void interpret_statement(ASTNode* node) {
+    if (!node) return;
+    
+    switch (node->type) {
+        case NODE_VARIABLE_DECL:
+            if (node->var_decl.initializer) {
+                int value = interpret_expression(node->var_decl.initializer);
+                set_variable(node->var_decl.var_name, value);
+            } else {
+                set_variable(node->var_decl.var_name, 0);
+            }
+            break;
+            
+        case NODE_ASSIGNMENT:
+            {
+                int value = interpret_expression(node->assignment.expression);
+                set_variable(node->assignment.var_name, value);
+            }
+            break;
+            
+        case NODE_IF_STATEMENT:
+            {
+                int condition = interpret_expression(node->if_stmt.condition);
+                if (condition) {
+                    interpret_statement(node->if_stmt.then_branch);
+                } else if (node->if_stmt.else_branch) {
+                    interpret_statement(node->if_stmt.else_branch);
+                }
+            }
+            break;
+            
+        case NODE_WHILE_STATEMENT:
+            {
+                while (interpret_expression(node->while_stmt.condition)) {
+                    interpret_statement(node->while_stmt.body);
+                }
+            }
+            break;
+            
+        case NODE_PRINT_STATEMENT:
+            {
+                int value = interpret_expression(node->print_stmt.expression);
+                printf("%d\n", value);
+            }
+            break;
+            
+        case NODE_RETURN_STATEMENT:
+            // В простой версии просто вычисляем выражение
+            if (node->return_stmt.expression) {
+                interpret_expression(node->return_stmt.expression);
+            }
+            break;
+            
+        case NODE_STATEMENT_LIST:
+            for (int i = 0; i < node->statement_list.count; i++) {
+                interpret_statement(node->statement_list.statements[i]);
+            }
+            break;
+            
+        default:
+            // Если это выражение, просто вычисляем его
+            interpret_expression(node);
+            break;
+    }
+}
+
+// Интерпретация выражения
+static int interpret_expression(ASTNode* node) {
     if (!node) return 0;
     
     switch (node->type) {
@@ -42,33 +125,37 @@ int interpret_ast(ASTNode* node) {
         case NODE_IDENTIFIER:
             return get_variable(node->identifier.name);
             
-        case NODE_STRING:
-            printf("%s", node->string.value);
-            return 0;
-            
         case NODE_UNARY_OP: {
-            int val = interpret_ast(node->unary.operand);
+            int val = interpret_expression(node->unary.operand);
             switch (node->unary.op) {
                 case TOKEN_PLUS: return +val;
                 case TOKEN_MINUS: return -val;
                 case TOKEN_NOT: return !val;
                 case TOKEN_BIT_NOT: return ~val;
-                case TOKEN_PLUS_PLUS: return val + 1;
-                case TOKEN_MINUS_MINUS: return val - 1;
-                default: return 0;
+                default: return val;
             }
         }
         
         case NODE_BINARY_OP: {
-            int left = interpret_ast(node->binary.left);
-            int right = interpret_ast(node->binary.right);
+            int left = interpret_expression(node->binary.left);
+            int right = interpret_expression(node->binary.right);
             
             switch (node->binary.op) {
                 case TOKEN_PLUS: return left + right;
                 case TOKEN_MINUS: return left - right;
                 case TOKEN_STAR: return left * right;
-                case TOKEN_SLASH: return right != 0 ? left / right : 0;
-                case TOKEN_PERCENT: return right != 0 ? left % right : 0;
+                case TOKEN_SLASH: 
+                    if (right == 0) {
+                        printf("Ошибка: деление на ноль\n");
+                        return 0;
+                    }
+                    return left / right;
+                case TOKEN_PERCENT:
+                    if (right == 0) {
+                        printf("Ошибка: деление на ноль\n");
+                        return 0;
+                    }
+                    return left % right;
                 case TOKEN_LT: return left < right;
                 case TOKEN_GT: return left > right;
                 case TOKEN_LE: return left <= right;
@@ -87,31 +174,43 @@ int interpret_ast(ASTNode* node) {
         }
         
         case NODE_TERNARY_OP:
-            return interpret_ast(node->ternary.condition) ? 
-                   interpret_ast(node->ternary.true_expr) : 
-                   interpret_ast(node->ternary.false_expr);
+            return interpret_expression(node->ternary.condition) ?
+                   interpret_expression(node->ternary.true_expr) :
+                   interpret_expression(node->ternary.false_expr);
         
         case NODE_ASSIGNMENT:
-            set_variable(node->assignment.var_name, 
-                        interpret_ast(node->assignment.expression));
-            return get_variable(node->assignment.var_name);
-        
-        case NODE_CALL: {
+            {
+                int value = interpret_expression(node->assignment.expression);
+                set_variable(node->assignment.var_name, value);
+                return value;
+            }
+            
+        case NODE_CALL:
             if (strcmp(node->call.func_name, "print") == 0) {
                 for (int i = 0; i < node->call.arg_count; i++) {
-                    int val = interpret_ast(node->call.args[i]);
+                    int val = interpret_expression(node->call.args[i]);
                     printf("%d", val);
                     if (i < node->call.arg_count - 1) printf(" ");
                 }
                 printf("\n");
                 return 0;
             }
-            printf("Неизвестная функция: %s\n", node->call.func_name);
+            printf("Предупреждение: вызов неизвестной функции '%s'\n", node->call.func_name);
             return 0;
-        }
-        
+            
         default:
-            printf("Неизвестный тип узла\n");
             return 0;
+    }
+}
+
+// Основная функция интерпретации AST
+int interpret_ast(ASTNode* node) {
+    if (!node) return 0;
+    
+    if (node->type == NODE_STATEMENT_LIST) {
+        interpret_statement(node);
+        return 0;
+    } else {
+        return interpret_expression(node);
     }
 }

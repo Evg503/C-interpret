@@ -1,13 +1,16 @@
-#pragma once
+#ifndef PARSER_H
+#define PARSER_H
 
-// Типы узлов AST для выражений
+#include "lexer.h"
+
+// Типы узлов AST
 typedef enum {
     NODE_NUMBER,
     NODE_IDENTIFIER,
     NODE_STRING,
     NODE_UNARY_OP,
     NODE_BINARY_OP,
-    NODE_TERNARY_OP,    // ? :
+    NODE_TERNARY_OP,
     NODE_ASSIGNMENT,
     NODE_CALL,
     NODE_VARIABLE_DECL,
@@ -36,7 +39,7 @@ typedef struct ASTNode {
             char* value;
         } string;
         struct {
-            int op;  // тип операции
+            int op;
             struct ASTNode* operand;
         } unary;
         struct {
@@ -61,7 +64,7 @@ typedef struct ASTNode {
         struct {
             char* var_name;
             struct ASTNode* initializer;
-            int type;  // INT, CHAR и т.д.
+            int var_type;
         } var_decl;
         struct {
             struct ASTNode** statements;
@@ -98,36 +101,12 @@ typedef struct {
     Token current;
 } Parser;
 
-// Приоритеты операций (чем выше число, тем выше приоритет)
-typedef struct {
-    int precedence;
-    int associativity; // 0 = left, 1 = right
-} Precedence;
-
-Precedence get_precedence(TokenType op);
-
-// Прототипы функций парсера
+// Функции парсера
+void init_parser(Parser* parser, Lexer* lexer);
 ASTNode* parse_program(Parser* parser);
 ASTNode* parse_statement(Parser* parser);
 ASTNode* parse_expression(Parser* parser);
-ASTNode* parse_assignment(Parser* parser);
-ASTNode* parse_ternary(Parser* parser);
-ASTNode* parse_logical_or(Parser* parser);
-ASTNode* parse_logical_and(Parser* parser);
-ASTNode* parse_bitwise_or(Parser* parser);
-ASTNode* parse_bitwise_xor(Parser* parser);
-ASTNode* parse_bitwise_and(Parser* parser);
-ASTNode* parse_equality(Parser* parser);
-ASTNode* parse_relational(Parser* parser);
-ASTNode* parse_shift(Parser* parser);
-ASTNode* parse_additive(Parser* parser);
-ASTNode* parse_multiplicative(Parser* parser);
-ASTNode* parse_unary(Parser* parser);
-ASTNode* parse_primary(Parser* parser);
 void free_ast(ASTNode* node);
+void print_ast(ASTNode* node, int indent);
 
-void init_parser(Parser* parser, Lexer* lexer);
-void advance(Parser* parser);
-bool match(Parser* parser, TokenType type);
-void expect(Parser* parser, TokenType type, const char* error_message);
-
+#endif // PARSER_H
