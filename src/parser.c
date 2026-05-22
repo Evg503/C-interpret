@@ -39,6 +39,42 @@ void expect(Parser* parser, TokenType type, const char* error_message) {
     advance(parser);
 }
 
+Precedence get_precedence(TokenType op) {
+    switch (op) {
+        // Тернарный оператор (низший приоритет)
+        case TOKEN_ASSIGN: return (Precedence){1, 1}; // right-associative
+        
+        // Логические операторы
+        case TOKEN_OR: return (Precedence){2, 0};
+        case TOKEN_AND: return (Precedence){3, 0};
+        
+        // Битовые OR
+        case TOKEN_BIT_OR: return (Precedence){4, 0};
+        case TOKEN_BIT_XOR: return (Precedence){5, 0};
+        case TOKEN_BIT_AND: return (Precedence){6, 0};
+        
+        // Сравнение
+        case TOKEN_EQ: case TOKEN_NEQ: return (Precedence){7, 0};
+        case TOKEN_LT: case TOKEN_GT: case TOKEN_LE: case TOKEN_GE: 
+            return (Precedence){8, 0};
+        
+        // Сдвиги
+        case TOKEN_SHIFT_LEFT: case TOKEN_SHIFT_RIGHT: 
+            return (Precedence){9, 0};
+        
+        // Сложение/вычитание
+        case TOKEN_PLUS: case TOKEN_MINUS: 
+            return (Precedence){10, 0};
+        
+        // Умножение/деление/остаток
+        case TOKEN_STAR: case TOKEN_SLASH: case TOKEN_PERCENT: 
+            return (Precedence){11, 0};
+        
+        // Унарные операторы (высший приоритет)
+        default: return (Precedence){0, 0};
+    }
+}
+
 // Парсинг программы (список операторов)
 ASTNode* parse_program(Parser* parser) {
     ASTNode* node = (ASTNode*)malloc(sizeof(ASTNode));
@@ -172,98 +208,279 @@ ASTNode* parse_statement(Parser* parser) {
     exit(1);
 }
 
-// Парсинг присваивания
-ASTNode* parse_assignment(Parser* parser) {
-    ASTNode* node = (ASTNode*)malloc(sizeof(ASTNode));
-    node->type = NODE_ASSIGNMENT;
-    
-    expect(parser, TOKEN_IDENTIFIER, "Ожидается идентификатор");
-    node->assignment.var_name = strdup(parser->current.value); // Сохраняем имя
-    char* var_name = strdup(parser->current.value);
-    node->assignment.var_name = var_name;
-    
-    expect(parser, TOKEN_ASSIGN, "Ожидается '='");
-    node->assignment.expression = parse_expression(parser);
-    expect(parser, TOKEN_SEMICOLON, "Ожидается ';' после присваивания");
-    
-    return node;
-}
-
-// Парсинг выражения (сравнение)
+// Основная функция парсинга выражений с приоритетами
 ASTNode* parse_expression(Parser* parser) {
-    return parse_comparison(parser);
+    return parse_assignment(parser);
 }
 
-// Парсинг сравнения
-ASTNode* parse_comparison(Parser* parser) {
-    ASTNode* node = parse_additive(parser);
+// Присваивание (самый низкий приоритет)
+ASTNode* parse_assignment(Parser* parser) {
+    ASTNode* node = parse_ternary(parser);
     
-    while (1) {
-        TokenType op = parser->current.type;
-        if (op == TOKEN_LT || op == TOKEN_GT || op == TOKEN_EQ || 
-            op == TOKEN_NEQ || op == TOKEN_LE || op == TOKEN_GE) {
-            advance(parser);
-            ASTNode* new_node = (ASTNode*)malloc(sizeof(ASTNode));
-            new_node->type = NODE_BINARY_OP;
-            new_node->binary_op.left = node;
-            new_node->binary_op.right = parse_additive(parser);
-            
-            // Преобразуем тип оператора в символ для упрощения
-            switch (op) {
-                case TOKEN_LT: new_node->binary_op.op = '<'; break;
-                case TOKEN_GT: new_node->binary_op.op = '>'; break;
-                case TOKEN_EQ: new_node->binary_op.op = '='; break;
-                case TOKEN_NEQ: new_node->binary_op.op = '!'; break;
-                default: new_node->binary_op.op = '?';
-            }
-            node = new_node;
-        } else {
-            break;
+    if (parser->current.type == TOKEN_ASSIGN) {
+        advance(parser);
+        ASTNode* right = parse_assignment(parser);
+        
+        // Проверяем, что слева - lvalue (идентификатор)
+        if (node->type != NODE_IDENTIFIER) {
+            printf("Ошибка: левая часть присваивания должна быть lvalue\n");
+            exit(1);
         }
+        
+        ASTNode* assign = (ASTNode*)malloc(sizeof(ASTNode));
+        assign->type = NODE_ASSIGNMENT;
+        assign->assignment.var_name = strdup(node->identifier.name);
+        assign->assignment.expression = right;
+        free_ast(node); // Освобождаем старый узел
+        return assign;
     }
     
     return node;
 }
 
-// Парсинг сложения/вычитания
+// Тернарный оператор ? :
+ASTNode* parse_ternary(Parser* parser) {
+    ASTNode* node = parse_logical_or(parser);
+    
+    if (parser->current.type == TOKEN_OR) { // Временно используем TOKEN_OR для '?'
+        advance(parser);
+        ASTNode* true_expr = parse_expression(parser);
+        expect(parser, TOKEN_ASSIGN, "Ожидается ':'"); // Временно
+        ASTNode* false_expr = parse_ternary(parser);
+        
+        ASTNode* ternary = (ASTNode*)malloc(sizeof(ASTNode));
+        ternary->type = NODE_TERNARY_OP;
+        ternary->ternary.condition = node;
+        ternary->ternary.true_expr = true_expr;
+        ternary->ternary.false_expr = false_expr;
+        return ternary;
+    }
+    
+    return node;
+}
+
+// Логическое ИЛИ
+ASTNode* parse_logical_or(Parser* parser) {
+    ASTNode* node = parse_logical_and(parser);
+    
+    while (parser->current.type == TOKEN_OR) {
+        int op = parser->current.type;
+        advance(parser);
+        ASTNode* right = parse_logical_and(parser);
+        
+        ASTNode* binary = (ASTNode*)malloc(sizeof(ASTNode));
+        binary->type = NODE_BINARY_OP;
+        binary->binary.op = op;
+        binary->binary.left = node;
+        binary->binary.right = right;
+        node = binary;
+    }
+    
+    return node;
+}
+
+// Логическое И
+ASTNode* parse_logical_and(Parser* parser) {
+    ASTNode* node = parse_bitwise_or(parser);
+    
+    while (parser->current.type == TOKEN_AND) {
+        int op = parser->current.type;
+        advance(parser);
+        ASTNode* right = parse_bitwise_or(parser);
+        
+        ASTNode* binary = (ASTNode*)malloc(sizeof(ASTNode));
+        binary->type = NODE_BINARY_OP;
+        binary->binary.op = op;
+        binary->binary.left = node;
+        binary->binary.right = right;
+        node = binary;
+    }
+    
+    return node;
+}
+
+// Битовое ИЛИ
+ASTNode* parse_bitwise_or(Parser* parser) {
+    ASTNode* node = parse_bitwise_xor(parser);
+    
+    while (parser->current.type == TOKEN_BIT_OR) {
+        int op = parser->current.type;
+        advance(parser);
+        ASTNode* right = parse_bitwise_xor(parser);
+        
+        ASTNode* binary = (ASTNode*)malloc(sizeof(ASTNode));
+        binary->type = NODE_BINARY_OP;
+        binary->binary.op = op;
+        binary->binary.left = node;
+        binary->binary.right = right;
+        node = binary;
+    }
+    
+    return node;
+}
+
+// Битовое XOR
+ASTNode* parse_bitwise_xor(Parser* parser) {
+    ASTNode* node = parse_bitwise_and(parser);
+    
+    while (parser->current.type == TOKEN_BIT_XOR) {
+        int op = parser->current.type;
+        advance(parser);
+        ASTNode* right = parse_bitwise_and(parser);
+        
+        ASTNode* binary = (ASTNode*)malloc(sizeof(ASTNode));
+        binary->type = NODE_BINARY_OP;
+        binary->binary.op = op;
+        binary->binary.left = node;
+        binary->binary.right = right;
+        node = binary;
+    }
+    
+    return node;
+}
+
+// Битовое И
+ASTNode* parse_bitwise_and(Parser* parser) {
+    ASTNode* node = parse_equality(parser);
+    
+    while (parser->current.type == TOKEN_BIT_AND) {
+        int op = parser->current.type;
+        advance(parser);
+        ASTNode* right = parse_equality(parser);
+        
+        ASTNode* binary = (ASTNode*)malloc(sizeof(ASTNode));
+        binary->type = NODE_BINARY_OP;
+        binary->binary.op = op;
+        binary->binary.left = node;
+        binary->binary.right = right;
+        node = binary;
+    }
+    
+    return node;
+}
+
+// Операторы равенства
+ASTNode* parse_equality(Parser* parser) {
+    ASTNode* node = parse_relational(parser);
+    
+    while (parser->current.type == TOKEN_EQ || parser->current.type == TOKEN_NEQ) {
+        int op = parser->current.type;
+        advance(parser);
+        ASTNode* right = parse_relational(parser);
+        
+        ASTNode* binary = (ASTNode*)malloc(sizeof(ASTNode));
+        binary->type = NODE_BINARY_OP;
+        binary->binary.op = op;
+        binary->binary.left = node;
+        binary->binary.right = right;
+        node = binary;
+    }
+    
+    return node;
+}
+
+// Операторы сравнения
+ASTNode* parse_relational(Parser* parser) {
+    ASTNode* node = parse_shift(parser);
+    
+    while (parser->current.type == TOKEN_LT || parser->current.type == TOKEN_GT ||
+           parser->current.type == TOKEN_LE || parser->current.type == TOKEN_GE) {
+        int op = parser->current.type;
+        advance(parser);
+        ASTNode* right = parse_shift(parser);
+        
+        ASTNode* binary = (ASTNode*)malloc(sizeof(ASTNode));
+        binary->type = NODE_BINARY_OP;
+        binary->binary.op = op;
+        binary->binary.left = node;
+        binary->binary.right = right;
+        node = binary;
+    }
+    
+    return node;
+}
+
+// Операторы сдвига
+ASTNode* parse_shift(Parser* parser) {
+    ASTNode* node = parse_additive(parser);
+    
+    while (parser->current.type == TOKEN_SHIFT_LEFT || parser->current.type == TOKEN_SHIFT_RIGHT) {
+        int op = parser->current.type;
+        advance(parser);
+        ASTNode* right = parse_additive(parser);
+        
+        ASTNode* binary = (ASTNode*)malloc(sizeof(ASTNode));
+        binary->type = NODE_BINARY_OP;
+        binary->binary.op = op;
+        binary->binary.left = node;
+        binary->binary.right = right;
+        node = binary;
+    }
+    
+    return node;
+}
+
+// Сложение и вычитание
 ASTNode* parse_additive(Parser* parser) {
     ASTNode* node = parse_multiplicative(parser);
     
     while (parser->current.type == TOKEN_PLUS || parser->current.type == TOKEN_MINUS) {
-        char op = (parser->current.type == TOKEN_PLUS) ? '+' : '-';
+        int op = parser->current.type;
         advance(parser);
+        ASTNode* right = parse_multiplicative(parser);
         
-        ASTNode* new_node = (ASTNode*)malloc(sizeof(ASTNode));
-        new_node->type = NODE_BINARY_OP;
-        new_node->binary_op.left = node;
-        new_node->binary_op.right = parse_multiplicative(parser);
-        new_node->binary_op.op = op;
-        node = new_node;
+        ASTNode* binary = (ASTNode*)malloc(sizeof(ASTNode));
+        binary->type = NODE_BINARY_OP;
+        binary->binary.op = op;
+        binary->binary.left = node;
+        binary->binary.right = right;
+        node = binary;
     }
     
     return node;
 }
 
-// Парсинг умножения/деления
+// Умножение, деление, остаток
 ASTNode* parse_multiplicative(Parser* parser) {
-    ASTNode* node = parse_primary(parser);
+    ASTNode* node = parse_unary(parser);
     
-    while (parser->current.type == TOKEN_STAR || parser->current.type == TOKEN_SLASH) {
-        char op = (parser->current.type == TOKEN_STAR) ? '*' : '/';
+    while (parser->current.type == TOKEN_STAR || parser->current.type == TOKEN_SLASH ||
+           parser->current.type == TOKEN_PERCENT) {
+        int op = parser->current.type;
         advance(parser);
+        ASTNode* right = parse_unary(parser);
         
-        ASTNode* new_node = (ASTNode*)malloc(sizeof(ASTNode));
-        new_node->type = NODE_BINARY_OP;
-        new_node->binary_op.left = node;
-        new_node->binary_op.right = parse_primary(parser);
-        new_node->binary_op.op = op;
-        node = new_node;
+        ASTNode* binary = (ASTNode*)malloc(sizeof(ASTNode));
+        binary->type = NODE_BINARY_OP;
+        binary->binary.op = op;
+        binary->binary.left = node;
+        binary->binary.right = right;
+        node = binary;
     }
     
     return node;
 }
 
-// Парсинг первичных выражений (числа, идентификаторы, скобки)
+// Унарные операторы
+ASTNode* parse_unary(Parser* parser) {
+    TokenType op = parser->current.type;
+    
+    if (op == TOKEN_PLUS || op == TOKEN_MINUS || op == TOKEN_NOT || 
+        op == TOKEN_BIT_NOT || op == TOKEN_PLUS_PLUS || op == TOKEN_MINUS_MINUS) {
+        advance(parser);
+        ASTNode* operand = parse_unary(parser);
+        
+        ASTNode* unary = (ASTNode*)malloc(sizeof(ASTNode));
+        unary->type = NODE_UNARY_OP;
+        unary->unary.op = op;
+        unary->unary.operand = operand;
+        return unary;
+    }
+    
+    return parse_primary(parser);
+}
+
+// Первичные выражения (литералы, идентификаторы, скобки)
 ASTNode* parse_primary(Parser* parser) {
     ASTNode* node = NULL;
     
@@ -275,11 +492,47 @@ ASTNode* parse_primary(Parser* parser) {
         return node;
     }
     
+    if (parser->current.type == TOKEN_STRING) {
+        node = (ASTNode*)malloc(sizeof(ASTNode));
+        node->type = NODE_STRING;
+        node->string.value = strdup(parser->current.value);
+        advance(parser);
+        return node;
+    }
+    
     if (parser->current.type == TOKEN_IDENTIFIER) {
         node = (ASTNode*)malloc(sizeof(ASTNode));
         node->type = NODE_IDENTIFIER;
         node->identifier.name = strdup(parser->current.value);
         advance(parser);
+        
+        // Проверка на вызов функции
+        if (parser->current.type == TOKEN_LPAREN) {
+            advance(parser);
+            ASTNode* call = (ASTNode*)malloc(sizeof(ASTNode));
+            call->type = NODE_CALL;
+            call->call.func_name = strdup(node->identifier.name);
+            call->call.args = NULL;
+            call->call.arg_count = 0;
+            
+            // Парсим аргументы
+            if (parser->current.type != TOKEN_RPAREN) {
+                int capacity = 4;
+                call->call.args = (ASTNode**)malloc(capacity * sizeof(ASTNode*));
+                do {
+                    if (call->call.arg_count >= capacity) {
+                        capacity *= 2;
+                        call->call.args = (ASTNode**)realloc(call->call.args, capacity * sizeof(ASTNode*));
+                    }
+                    call->call.args[call->call.arg_count++] = parse_expression(parser);
+                } while (match(parser, TOKEN_COMMA));
+            }
+            
+            expect(parser, TOKEN_RPAREN, "Ожидается ')' после аргументов функции");
+            free_ast(node);
+            return call;
+        }
+        
         return node;
     }
     
@@ -291,7 +544,47 @@ ASTNode* parse_primary(Parser* parser) {
     }
     
     printf("Ошибка: неожиданный токен ");
-    print_token(&parser->current);
+    // print_token(&parser->current);
     printf("\n");
     exit(1);
+}
+
+// Функция освобождения AST (рекурсивная)
+void free_ast(ASTNode* node) {
+    if (!node) return;
+    
+    switch (node->type) {
+        case NODE_IDENTIFIER:
+            free(node->identifier.name);
+            break;
+        case NODE_STRING:
+            free(node->string.value);
+            break;
+        case NODE_UNARY_OP:
+            free_ast(node->unary.operand);
+            break;
+        case NODE_BINARY_OP:
+            free_ast(node->binary.left);
+            free_ast(node->binary.right);
+            break;
+        case NODE_TERNARY_OP:
+            free_ast(node->ternary.condition);
+            free_ast(node->ternary.true_expr);
+            free_ast(node->ternary.false_expr);
+            break;
+        case NODE_ASSIGNMENT:
+            free(node->assignment.var_name);
+            free_ast(node->assignment.expression);
+            break;
+        case NODE_CALL:
+            free(node->call.func_name);
+            for (int i = 0; i < node->call.arg_count; i++)
+                free_ast(node->call.args[i]);
+            free(node->call.args);
+            break;
+        default:
+            break;
+    }
+    
+    free(node);
 }

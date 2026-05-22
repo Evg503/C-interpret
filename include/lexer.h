@@ -1,33 +1,65 @@
 #pragma once
 
-// Типы токенов
+// Типы токенов (расширенные)
 typedef enum {
     TOKEN_EOF = 0,
     TOKEN_IDENTIFIER,
     TOKEN_NUMBER,
-    TOKEN_KEYWORD,
-    TOKEN_PLUS,      // +
-    TOKEN_MINUS,     // -
-    TOKEN_STAR,      // *
-    TOKEN_SLASH,     // /
-    TOKEN_ASSIGN,    // =
-    TOKEN_SEMICOLON, // ;
-    TOKEN_LPAREN,    // (
-    TOKEN_RPAREN,    // )
-    TOKEN_LBRACE,    // {
-    TOKEN_RBRACE,    // }
-    TOKEN_LT,        // <
-    TOKEN_GT,        // >
-    TOKEN_EQ,        // ==
-    TOKEN_NEQ,       // !=
-    TOKEN_LE,        // <=
-    TOKEN_GE,        // >=
+    TOKEN_STRING,
+    
+    // Операторы
+    TOKEN_ASSIGN,       // =
+    TOKEN_PLUS,         // +
+    TOKEN_MINUS,        // -
+    TOKEN_STAR,         // *
+    TOKEN_SLASH,        // /
+    TOKEN_PERCENT,      // %
+    TOKEN_PLUS_PLUS,    // ++
+    TOKEN_MINUS_MINUS,  // --
+    
+    // Сравнение
+    TOKEN_EQ,           // ==
+    TOKEN_NEQ,          // !=
+    TOKEN_LT,           // <
+    TOKEN_GT,           // >
+    TOKEN_LE,           // <=
+    TOKEN_GE,           // >=
+    
+    // Логические
+    TOKEN_AND,          // &&
+    TOKEN_OR,           // ||
+    TOKEN_NOT,          // !
+    
+    // Битовые
+    TOKEN_BIT_AND,      // &
+    TOKEN_BIT_OR,       // |
+    TOKEN_BIT_XOR,      // ^
+    TOKEN_BIT_NOT,      // ~
+    TOKEN_SHIFT_LEFT,   // <<
+    TOKEN_SHIFT_RIGHT,  // >>
+    
+    // Разделители
+    TOKEN_SEMICOLON,    // ;
+    TOKEN_COMMA,        // ,
+    TOKEN_LPAREN,       // (
+    TOKEN_RPAREN,       // )
+    TOKEN_LBRACE,       // {
+    TOKEN_RBRACE,       // }
+    TOKEN_LBRACKET,     // [
+    TOKEN_RBRACKET,     // ]
+    
+    // Ключевые слова
     TOKEN_IF,
     TOKEN_ELSE,
     TOKEN_WHILE,
+    TOKEN_FOR,
     TOKEN_RETURN,
     TOKEN_INT,
-    TOKEN_PRINT
+    TOKEN_CHAR,
+    TOKEN_VOID,
+    TOKEN_PRINT,
+    TOKEN_BREAK,
+    TOKEN_CONTINUE
 } TokenType;
 
 // Структура токена

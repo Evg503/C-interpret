@@ -9,7 +9,6 @@
 
 
 // Функция для печати AST (отладка)
-
 void print_ast(ASTNode* node, int indent) {
     if (!node) return;
     
@@ -22,92 +21,78 @@ void print_ast(ASTNode* node, int indent) {
         case NODE_IDENTIFIER:
             printf("IDENTIFIER(%s)\n", node->identifier.name);
             break;
+        case NODE_STRING:
+            printf("STRING(\"%s\")\n", node->string.value);
+            break;
+        case NODE_UNARY_OP:
+            printf("UNARY_OP(%d)\n", node->unary.op);
+            print_ast(node->unary.operand, indent + 1);
+            break;
         case NODE_BINARY_OP:
-            printf("BINARY_OP(%c)\n", node->binary_op.op);
-            print_ast(node->binary_op.left, indent + 1);
-            print_ast(node->binary_op.right, indent + 1);
+            printf("BINARY_OP(%d)\n", node->binary.op);
+            print_ast(node->binary.left, indent + 1);
+            print_ast(node->binary.right, indent + 1);
+            break;
+        case NODE_TERNARY_OP:
+            printf("TERNARY_OP\n");
+            printf("  Condition:\n");
+            print_ast(node->ternary.condition, indent + 1);
+            printf("  True:\n");
+            print_ast(node->ternary.true_expr, indent + 1);
+            printf("  False:\n");
+            print_ast(node->ternary.false_expr, indent + 1);
             break;
         case NODE_ASSIGNMENT:
             printf("ASSIGNMENT(%s)\n", node->assignment.var_name);
             print_ast(node->assignment.expression, indent + 1);
             break;
-        case NODE_VARIABLE_DECL:
-            printf("VARIABLE_DECL(%s)\n", node->var_decl.var_name);
-            if (node->var_decl.initializer)
-                print_ast(node->var_decl.initializer, indent + 1);
+        case NODE_CALL:
+            printf("CALL(%s, %d args)\n", node->call.func_name, node->call.arg_count);
+            for (int i = 0; i < node->call.arg_count; i++)
+                print_ast(node->call.args[i], indent + 1);
             break;
-        case NODE_STATEMENT_LIST:
-            printf("STATEMENT_LIST (%d statements)\n", node->statement_list.count);
-            for (int i = 0; i < node->statement_list.count; i++)
-                print_ast(node->statement_list.statements[i], indent + 1);
-            break;
-        case NODE_IF_STATEMENT:
-            printf("IF_STATEMENT\n");
-            printf("  Condition:\n");
-            print_ast(node->if_stmt.condition, indent + 1);
-            printf("  Then:\n");
-            print_ast(node->if_stmt.then_branch, indent + 1);
-            if (node->if_stmt.else_branch) {
-                printf("  Else:\n");
-                print_ast(node->if_stmt.else_branch, indent + 1);
-            }
-            break;
-        case NODE_WHILE_STATEMENT:
-            printf("WHILE_STATEMENT\n");
-            printf("  Condition:\n");
-            print_ast(node->while_stmt.condition, indent + 1);
-            printf("  Body:\n");
-            print_ast(node->while_stmt.body, indent + 1);
-            break;
-        case NODE_PRINT_STATEMENT:
-            printf("PRINT\n");
-            print_ast(node->print_stmt.expression, indent + 1);
-            break;
+        default:
+            printf("UNKNOWN\n");
     }
 }
 
-// Освобождение AST
-void free_ast(ASTNode* node) {
-    if (!node) return;
+// Тестовая функция
+int test_expressions() {
+    // Тестовые выражения
+    const char* expressions[] = {
+        "1 + 2 * 3",
+        "(1 + 2) * 3",
+        "a = b = 5",
+        "x = 10 + (y = 20) * 3",
+        "a + b * c - d / e % f",
+        "x > 0 && y < 10 || z == 5",
+        "!a && b || c",
+        "a << 2 + b >> 1",
+        "max(10, 20, 30)",
+        "a ? b : c",
+        "++i",
+        "-x * 3",
+        NULL
+    };
     
-    switch (node->type) {
-        case NODE_IDENTIFIER:
-            free(node->identifier.name);
-            break;
-        case NODE_ASSIGNMENT:
-            free(node->assignment.var_name);
-            free_ast(node->assignment.expression);
-            break;
-        case NODE_VARIABLE_DECL:
-            free(node->var_decl.var_name);
-            free_ast(node->var_decl.initializer);
-            break;
-        case NODE_BINARY_OP:
-            free_ast(node->binary_op.left);
-            free_ast(node->binary_op.right);
-            break;
-        case NODE_STATEMENT_LIST:
-            for (int i = 0; i < node->statement_list.count; i++)
-                free_ast(node->statement_list.statements[i]);
-            free(node->statement_list.statements);
-            break;
-        case NODE_IF_STATEMENT:
-            free_ast(node->if_stmt.condition);
-            free_ast(node->if_stmt.then_branch);
-            free_ast(node->if_stmt.else_branch);
-            break;
-        case NODE_WHILE_STATEMENT:
-            free_ast(node->while_stmt.condition);
-            free_ast(node->while_stmt.body);
-            break;
-        case NODE_PRINT_STATEMENT:
-            free_ast(node->print_stmt.expression);
-            break;
-        default:
-            break;
+    for (int i = 0; expressions[i] != NULL; i++) {
+        printf("\n=== Тест %d: %s ===\n", i+1, expressions[i]);
+        
+        Lexer lexer;
+        init_lexer(&lexer, expressions[i]);
+        
+        Parser parser;
+        init_parser(&parser, &lexer);
+        
+        ASTNode* ast = parse_expression(&parser);
+        
+        printf("AST:\n");
+        print_ast(ast, 0);
+        
+        free_ast(ast);
     }
     
-    free(node);
+    return 0;
 }
 
 int main() {
@@ -124,6 +109,9 @@ int main() {
         "while (x > 0) {\n"
         "    x = x - 1;\n"
         "}\n";
+    
+    
+    test_expressions();
     
     printf("Исходная программа:\n%s\n", program);
     printf("\n=== Лексический анализ ===\n");

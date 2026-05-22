@@ -10,9 +10,14 @@ Keyword keywords[] = {
     {"if", TOKEN_IF},
     {"else", TOKEN_ELSE},
     {"while", TOKEN_WHILE},
+    {"for", TOKEN_FOR},
     {"return", TOKEN_RETURN},
     {"int", TOKEN_INT},
+    {"char", TOKEN_CHAR},
+    {"void", TOKEN_VOID},
     {"print", TOKEN_PRINT},
+    {"break", TOKEN_BREAK},
+    {"continue", TOKEN_CONTINUE},
     {NULL, TOKEN_EOF}
 };
 
@@ -24,11 +29,10 @@ void init_lexer(Lexer* lexer, const char* source) {
     lexer->col = 1;
 }
 
-// Пропуск пробелов и комментариев
 void skip_whitespace(Lexer* lexer) {
     while (lexer->source[lexer->pos]) {
         char c = lexer->source[lexer->pos];
-        if (c == ' ' || c == '\t') {
+        if (c == ' ' || c == '\t' || c == '\r') {
             lexer->pos++;
             lexer->col++;
         } else if (c == '\n') {
@@ -36,10 +40,25 @@ void skip_whitespace(Lexer* lexer) {
             lexer->line++;
             lexer->col = 1;
         } else if (c == '/') {
-            // Проверка на комментарий //
             if (lexer->source[lexer->pos + 1] == '/') {
                 while (lexer->source[lexer->pos] && lexer->source[lexer->pos] != '\n')
                     lexer->pos++;
+            } else if (lexer->source[lexer->pos + 1] == '*') {
+                // Многострочный комментарий
+                lexer->pos += 2;
+                while (lexer->source[lexer->pos] && 
+                       !(lexer->source[lexer->pos] == '*' && lexer->source[lexer->pos + 1] == '/')) {
+                    if (lexer->source[lexer->pos] == '\n') {
+                        lexer->line++;
+                        lexer->col = 1;
+                    } else {
+                        lexer->col++;
+                    }
+                    lexer->pos++;
+                }
+                if (lexer->source[lexer->pos]) {
+                    lexer->pos += 2;
+                }
             } else {
                 break;
             }
@@ -48,6 +67,7 @@ void skip_whitespace(Lexer* lexer) {
         }
     }
 }
+
 
 // Чтение числа
 char* read_number(Lexer* lexer) {
@@ -102,11 +122,26 @@ Token get_next_token(Lexer* lexer) {
         return token;
     }
     
+    // Строки
+    if (c == '"') {
+        lexer->pos++;
+        int start = lexer->pos;
+        while (lexer->source[lexer->pos] && lexer->source[lexer->pos] != '"')
+            lexer->pos++;
+        int len = lexer->pos - start;
+        char* str = (char*)malloc(len + 1);
+        strncpy(str, lexer->source + start, len);
+        str[len] = '\0';
+        lexer->pos++;
+        token.type = TOKEN_STRING;
+        token.value = str;
+        return token;
+    }
+    
     // Идентификаторы и ключевые слова
     if (isalpha(c) || c == '_') {
         char* id = read_identifier(lexer);
         
-        // Проверка на ключевое слово
         int i = 0;
         while (keywords[i].word != NULL) {
             if (strcmp(id, keywords[i].word) == 0) {
@@ -122,18 +157,42 @@ Token get_next_token(Lexer* lexer) {
         return token;
     }
     
-    // Операторы
+    // Операторы (многосимвольные проверяем первыми)
     lexer->pos++;
     lexer->col++;
     
     switch (c) {
-        case '+': token.type = TOKEN_PLUS; break;
-        case '-': token.type = TOKEN_MINUS; break;
-        case '*': token.type = TOKEN_STAR; break;
-        case '/': token.type = TOKEN_SLASH; break;
+        case '+':
+            if (lexer->source[lexer->pos] == '+') {
+                lexer->pos++;
+                lexer->col++;
+                token.type = TOKEN_PLUS_PLUS;
+            } else {
+                token.type = TOKEN_PLUS;
+            }
+            break;
+        case '-':
+            if (lexer->source[lexer->pos] == '-') {
+                lexer->pos++;
+                lexer->col++;
+                token.type = TOKEN_MINUS_MINUS;
+            } else {
+                token.type = TOKEN_MINUS;
+            }
+            break;
+        case '*':
+            token.type = TOKEN_STAR;
+            break;
+        case '/':
+            token.type = TOKEN_SLASH;
+            break;
+        case '%':
+            token.type = TOKEN_PERCENT;
+            break;
         case '=':
             if (lexer->source[lexer->pos] == '=') {
                 lexer->pos++;
+                lexer->col++;
                 token.type = TOKEN_EQ;
             } else {
                 token.type = TOKEN_ASSIGN;
@@ -142,7 +201,12 @@ Token get_next_token(Lexer* lexer) {
         case '<':
             if (lexer->source[lexer->pos] == '=') {
                 lexer->pos++;
+                lexer->col++;
                 token.type = TOKEN_LE;
+            } else if (lexer->source[lexer->pos] == '<') {
+                lexer->pos++;
+                lexer->col++;
+                token.type = TOKEN_SHIFT_LEFT;
             } else {
                 token.type = TOKEN_LT;
             }
@@ -150,7 +214,12 @@ Token get_next_token(Lexer* lexer) {
         case '>':
             if (lexer->source[lexer->pos] == '=') {
                 lexer->pos++;
+                lexer->col++;
                 token.type = TOKEN_GE;
+            } else if (lexer->source[lexer->pos] == '>') {
+                lexer->pos++;
+                lexer->col++;
+                token.type = TOKEN_SHIFT_RIGHT;
             } else {
                 token.type = TOKEN_GT;
             }
@@ -158,17 +227,50 @@ Token get_next_token(Lexer* lexer) {
         case '!':
             if (lexer->source[lexer->pos] == '=') {
                 lexer->pos++;
+                lexer->col++;
                 token.type = TOKEN_NEQ;
             } else {
-                printf("Ошибка: неожиданный символ '!'\n");
-                token.type = TOKEN_EOF;
+                token.type = TOKEN_NOT;
             }
             break;
+        case '&':
+            if (lexer->source[lexer->pos] == '&') {
+                lexer->pos++;
+                lexer->col++;
+                token.type = TOKEN_AND;
+            } else {
+                token.type = TOKEN_BIT_AND;
+            }
+            break;
+        case '|':
+            if (lexer->source[lexer->pos] == '|') {
+                lexer->pos++;
+                lexer->col++;
+                token.type = TOKEN_OR;
+            } else {
+                token.type = TOKEN_BIT_OR;
+            }
+            break;
+        case '^':
+            token.type = TOKEN_BIT_XOR;
+            break;
+        case '~':
+            token.type = TOKEN_BIT_NOT;
+            break;
+        case '?':
+            token.type = TOKEN_OR; // Временно, нужно добавить TOKEN_QUESTION
+            break;
+        case ':':
+            token.type = TOKEN_ASSIGN; // Временно
+            break;
         case ';': token.type = TOKEN_SEMICOLON; break;
+        case ',': token.type = TOKEN_COMMA; break;
         case '(': token.type = TOKEN_LPAREN; break;
         case ')': token.type = TOKEN_RPAREN; break;
         case '{': token.type = TOKEN_LBRACE; break;
         case '}': token.type = TOKEN_RBRACE; break;
+        case '[': token.type = TOKEN_LBRACKET; break;
+        case ']': token.type = TOKEN_RBRACKET; break;
         default:
             printf("Ошибка: неизвестный символ '%c' на строке %d\n", c, lexer->line);
             token.type = TOKEN_EOF;
