@@ -1,3 +1,4 @@
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,7 +7,7 @@
 
 #include "lexer.h"
 #include "parser.h"
-
+#include "interpreter.h"
 
 // Функция для печати AST (отладка)
 void print_ast(ASTNode* node, int indent) {
@@ -95,6 +96,52 @@ int test_expressions() {
     return 0;
 }
 
+// Тест интерпретатора
+int test_interpreter() {
+    const char* test_code = 
+        "a = 10\n"
+        "b = 20\n"
+        "c = a + b * 2\n"
+        "print(c)\n"
+        "d = (c - 10) / 2\n"
+        "print(d)\n"
+        "e = a > b ? a : b\n"
+        "print(e)\n"
+        "f = -a + b\n"
+        "print(f)\n";
+    
+    printf("=== Интерпретация программы ===\n");
+    
+    // Разбиваем на строки и интерпретируем
+    char* code_copy = strdup(test_code);
+    char* line = strtok(code_copy, "\n");
+    
+    while (line) {
+        printf("> %s\n", line);
+        
+        Lexer lexer;
+        init_lexer(&lexer, line);
+        
+        Parser parser;
+        init_parser(&parser, &lexer);
+        
+        ASTNode* ast = parse_expression(&parser);
+        int result = interpret_ast(ast);
+        
+        // Если выражение не было присваиванием или вызовом функции
+        if (ast->type != NODE_ASSIGNMENT && ast->type != NODE_CALL) {
+            printf("= %d\n", result);
+        }
+        
+        free_ast(ast);
+        line = strtok(NULL, "\n");
+    }
+    
+    free(code_copy);
+    
+    return 0;
+}
+
 int main() {
     // Тестовая программа
     const char* program = 
@@ -110,8 +157,9 @@ int main() {
         "    x = x - 1;\n"
         "}\n";
     
-    
+
     test_expressions();
+    test_interpreter();
     
     printf("Исходная программа:\n%s\n", program);
     printf("\n=== Лексический анализ ===\n");

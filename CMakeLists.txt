@@ -5,23 +5,20 @@ project(CSimpleInterpreter C)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# Опции сборки
-set(CMAKE_C_FLAGS_DEBUG "-g -O0 -Wall -Wextra  -Wno-deprecated-declarations")
-set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG")
 
 # Определяем исходные файлы
 set(SOURCES
     src/test_main.c
     src/lexer.c
     src/parser.c
-    #src/interpreter.c
+    src/interpreter.c
 
 )
 
 set(HEADERS
     include/lexer.h
     include/parser.h
-    #include/interpreter.h
+    include/interpreter.h
 )
 
 include_directories(include) 
@@ -39,6 +36,10 @@ if(WIN32)
     
     # Если используете LLVM/Clang с lld-link
     if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
+	# Опции сборки
+	set(CMAKE_C_FLAGS_DEBUG "-g -O0 -Wall -Wextra  -Wno-deprecated-declarations")
+	set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG")
+
         target_link_options(c_interpreter PRIVATE 
             -fuse-ld=lld
             #-lc
