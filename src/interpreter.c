@@ -47,9 +47,19 @@ void print_symbol_table(void) {
 
 static int interpret_expression(ASTNode* node);
 
+typedef enum {
+    EXECUTE_NORMAL,
+    EXECUTE_BREAK,
+    EXECUTE_CONTINUE
+} ExecutionResult;
+
+static ExecutionResult interpret_statement(ASTNode* node);
+
+static ExecutionResult interpret_statement_list(ASTNode* node_list);
+
 // Интерпретация оператора
-static void interpret_statement(ASTNode* node) {
-    if (!node) return;
+static ExecutionResult interpret_statement(ASTNode* node) {
+    if (!node) return EXECUTE_NORMAL;
     
     switch (node->type) {
         case NODE_VARIABLE_DECL:
@@ -72,9 +82,15 @@ static void interpret_statement(ASTNode* node) {
             {
                 int condition = interpret_expression(node->if_stmt.condition);
                 if (condition) {
-                    interpret_statement(node->if_stmt.then_branch);
+                    ExecutionResult result = interpret_statement(node->if_stmt.then_branch);
+                    if (result == EXECUTE_BREAK || result == EXECUTE_CONTINUE) {
+                        return result;
+                    }
                 } else if (node->if_stmt.else_branch) {
-                    interpret_statement(node->if_stmt.else_branch);
+                    ExecutionResult result = interpret_statement(node->if_stmt.else_branch);
+                    if (result == EXECUTE_BREAK || result == EXECUTE_CONTINUE) {
+                        return result;
+                    }
                 }
             }
             break;
@@ -82,7 +98,12 @@ static void interpret_statement(ASTNode* node) {
         case NODE_WHILE_STATEMENT:
             {
                 while (interpret_expression(node->while_stmt.condition)) {
-                    interpret_statement(node->while_stmt.body);
+                    ExecutionResult result = interpret_statement(node->while_stmt.body);
+                    if (result == EXECUTE_BREAK) {
+                        return EXECUTE_BREAK;
+                    } else if (result == EXECUTE_CONTINUE) {
+                        continue;
+                    }
                 }
             }
             break;
@@ -95,23 +116,39 @@ static void interpret_statement(ASTNode* node) {
             break;
             
         case NODE_RETURN_STATEMENT:
-            // В простой версии просто вычисляем выражение
             if (node->return_stmt.expression) {
                 interpret_expression(node->return_stmt.expression);
             }
             break;
             
+        case NODE_BREAK_STATEMENT:
+            return EXECUTE_BREAK;
+            
+        case NODE_CONTINUE_STATEMENT:
+            return EXECUTE_CONTINUE;
+            
         case NODE_STATEMENT_LIST:
-            for (int i = 0; i < node->statement_list.count; i++) {
-                interpret_statement(node->statement_list.statements[i]);
-            }
-            break;
+            return interpret_statement_list(node);
             
         default:
-            // Если это выражение, просто вычисляем его
             interpret_expression(node);
             break;
     }
+    return EXECUTE_NORMAL;
+}
+
+static ExecutionResult interpret_statement_list(ASTNode* node_list) {
+    if (!node_list || node_list->type != NODE_STATEMENT_LIST) {
+        return EXECUTE_NORMAL;
+    }
+    
+    for (int i = 0; i < node_list->statement_list.count; i++) {
+        ExecutionResult result = interpret_statement(node_list->statement_list.statements[i]);
+        if (result == EXECUTE_BREAK || result == EXECUTE_CONTINUE) {
+            return result;
+        }
+    }
+    return EXECUTE_NORMAL;
 }
 
 // Интерпретация выражения
@@ -211,6 +248,7 @@ int interpret_ast(ASTNode* node) {
         interpret_statement(node);
         return 0;
     } else {
-        return interpret_expression(node);
+        interpret_statement(node);
+        return 0;
     }
 }

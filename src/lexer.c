@@ -313,6 +313,8 @@ void print_token(Token* token) {
         case TOKEN_RETURN: printf("RETURN"); break;
         case TOKEN_INT: printf("INT"); break;
         case TOKEN_PRINT: printf("PRINT"); break;
+        case TOKEN_BREAK: printf("BREAK"); break;
+        case TOKEN_CONTINUE: printf("CONTINUE"); break;
         default: printf("UNKNOWN");
     }
 }

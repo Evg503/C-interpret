@@ -154,19 +154,22 @@ int main(int argc, char* argv[]) {
     test_previous();
     // Тестовая программа
     const char* program = 
-        "int x;\n"
-        "x = 10;\n"
-        "int y = 20;\n"
-        "x = x + y * 2;\n"
-        "if (x > 20) {\n"
-        "    print(x);\n"
-        "} else {\n"
-        "    print(0);\n"
+        "int i = 0;\n"
+        "while (i < 10) {\n"
+        "    i = i + 1;\n"
+        "    if (i == 5) {\n"
+        "        break;\n"
+        "    }\n"
+        "    print(i);\n"
         "}\n"
-        "while (x > 0) {\n"
-        "    x = x - 1;\n"
-        "}\n"
-        "print(x);\n";
+        "int j = 0;\n"
+        "while (j < 5) {\n"
+        "    j = j + 1;\n"
+        "    if (j == 3) {\n"
+        "        continue;\n"
+        "    }\n"
+        "    print(j);\n"
+        "}\n";
     
     printf("=== Исходная программа ===\n%s\n", program);
     printf("\n=== Лексический анализ ===\n");

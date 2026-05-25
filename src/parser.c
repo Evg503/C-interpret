@@ -238,6 +238,36 @@ ASTNode* parse_statement(Parser* parser) {
         return node;
     }
     
+    // Оператор break
+    if (parser->current.type == TOKEN_BREAK) {
+        int line = parser->current.line;
+        int column = parser->current.column;
+        advance(parser);
+        
+        ASTNode* node = (ASTNode*)calloc(1, sizeof(ASTNode));
+        node->type = NODE_BREAK_STATEMENT;
+        node->line = line;
+        node->column = column;
+        
+        expect(parser, TOKEN_SEMICOLON, "Ожидается ';' после break");
+        return node;
+    }
+    
+    // Оператор continue
+    if (parser->current.type == TOKEN_CONTINUE) {
+        int line = parser->current.line;
+        int column = parser->current.column;
+        advance(parser);
+        
+        ASTNode* node = (ASTNode*)calloc(1, sizeof(ASTNode));
+        node->type = NODE_CONTINUE_STATEMENT;
+        node->line = line;
+        node->column = column;
+        
+        expect(parser, TOKEN_SEMICOLON, "Ожидается ';' после continue");
+        return node;
+    }
+    
     // Присваивание или выражение
     ASTNode* node = parse_expression(parser);
     expect(parser, TOKEN_SEMICOLON, "Ожидается ';' после выражения");
@@ -633,6 +663,10 @@ void free_ast(ASTNode* node) {
         case NODE_PRINT_STATEMENT:
             free_ast(node->print_stmt.expression);
             break;
+        case NODE_BREAK_STATEMENT:
+            break;
+        case NODE_CONTINUE_STATEMENT:
+            break;
         default:
             break;
     }
@@ -719,6 +753,12 @@ void print_ast(ASTNode* node, int indent) {
         case NODE_PRINT_STATEMENT:
             printf("PRINT\n");
             print_ast(node->print_stmt.expression, indent + 1);
+            break;
+        case NODE_BREAK_STATEMENT:
+            printf("BREAK\n");
+            break;
+        case NODE_CONTINUE_STATEMENT:
+            printf("CONTINUE\n");
             break;
         default:
             printf("UNKNOWN\n");
