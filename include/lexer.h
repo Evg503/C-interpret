@@ -85,6 +85,8 @@ typedef struct {
     int pos;
     int line;
     int col;
+    char error_message[256];
+    int has_error;
 } Lexer;
 
 // Функции лексера
@@ -92,5 +94,7 @@ void init_lexer(Lexer* lexer, const char* source);
 Token get_next_token(Lexer* lexer);
 void print_token(Token* token);
 void free_token(Token* token);
+const char* lexer_get_error(Lexer* lexer);
+int lexer_has_error(Lexer* lexer);
 
 #endif // LEXER_H

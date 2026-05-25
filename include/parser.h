@@ -101,6 +101,8 @@ typedef struct ASTNode {
 typedef struct {
     Lexer* lexer;
     Token current;
+    char error_message[256];
+    int has_error;
 } Parser;
 
 // Функции парсера
@@ -110,5 +112,7 @@ ASTNode* parse_statement(Parser* parser);
 ASTNode* parse_expression(Parser* parser);
 void free_ast(ASTNode* node);
 void print_ast(ASTNode* node, int indent);
+const char* parser_get_error(Parser* parser);
+int parser_has_error(Parser* parser);
 
 #endif // PARSER_H

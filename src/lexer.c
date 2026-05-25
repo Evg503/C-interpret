@@ -26,6 +26,8 @@ void init_lexer(Lexer* lexer, const char* source) {
     lexer->pos = 0;
     lexer->line = 1;
     lexer->col = 1;
+    lexer->error_message[0] = '\0';
+    lexer->has_error = 0;
 }
 
 static void skip_whitespace(Lexer* lexer) {

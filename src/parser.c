@@ -22,13 +22,16 @@ static bool match(Parser* parser, TokenType type) {
     return false;
 }
 
-static void expect(Parser* parser, TokenType type, const char* error_message) {
+static bool expect(Parser* parser, TokenType type, const char* error_message) {
     if (parser->current.type != type) {
-        printf("Ошибка на строке %d, колонке %d: %s\n", 
-               parser->current.line, parser->current.column, error_message);
-        exit(1);
+        snprintf(parser->error_message, sizeof(parser->error_message),
+                "Ошибка на строке %d, колонке %d: %s", 
+                parser->current.line, parser->current.column, error_message);
+        parser->has_error = 1;
+        return false;
     }
     advance(parser);
+    return true;
 }
 
 // Функции парсинга выражений
@@ -283,9 +286,13 @@ static ASTNode* parse_block(Parser* parser) {
     block->statement_list.count = 0;
     block->statement_list.capacity = 0;
     
+    if (parser->has_error) {
+        free(block);
+        return NULL;
+    }
     expect(parser, TOKEN_LBRACE, "Ожидается '{'");
     
-    while (parser->current.type != TOKEN_RBRACE && parser->current.type != TOKEN_EOF) {
+    while (!parser->has_error && parser->current.type != TOKEN_RBRACE && parser->current.type != TOKEN_EOF) {
         ASTNode* stmt = parse_statement(parser);
         
         if (block->statement_list.count >= block->statement_list.capacity) {
@@ -319,8 +326,10 @@ static ASTNode* parse_assignment(Parser* parser) {
         ASTNode* right = parse_assignment(parser);
         
         if (node->type != NODE_IDENTIFIER) {
-            printf("Ошибка: левая часть присваивания должна быть lvalue\n");
-            exit(1);
+            snprintf(parser->error_message, sizeof(parser->error_message),
+                    "Ошибка: левая часть присваивания должна быть lvalue");
+            parser->has_error = 1;
+            return NULL;
         }
         
         ASTNode* assign = (ASTNode*)calloc(1, sizeof(ASTNode));
@@ -602,8 +611,10 @@ static ASTNode* parse_primary(Parser* parser) {
         return node;
     }
     
-    printf("Ошибка: неожиданный токен на строке %d\n", parser->current.line);
-    exit(1);
+    snprintf(parser->error_message, sizeof(parser->error_message),
+            "Ошибка: неожиданный токен на строке %d", parser->current.line);
+    parser->has_error = 1;
+    return NULL;
 }
 
 // Освобождение AST
@@ -763,4 +774,12 @@ void print_ast(ASTNode* node, int indent) {
         default:
             printf("UNKNOWN\n");
     }
+}
+
+const char* parser_get_error(Parser* parser) {
+    return parser->error_message;
+}
+
+int parser_has_error(Parser* parser) {
+    return parser->has_error;
 }
