@@ -31,7 +31,28 @@ set_target_properties(lexer_tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
-add_test(NAME LexerTests COMMAND lexer_tests)
+add_executable(parser_tests 
+    tests/unity.c
+    tests/parser_tests.c
+)
+target_include_directories(parser_tests PRIVATE tests include ${CMAKE_CURRENT_SOURCE_DIR})
+set_target_properties(parser_tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+add_test(NAME ParserTests COMMAND parser_tests)
+
+add_executable(interpreter_tests 
+    tests/unity.c
+    tests/interpreter_tests.c
+    src/lexer.c
+    src/parser.c
+    src/interpreter.c
+)
+target_include_directories(interpreter_tests PRIVATE tests include ${CMAKE_CURRENT_SOURCE_DIR})
+set_target_properties(interpreter_tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+add_test(NAME InterpreterTests COMMAND interpreter_tests)
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C compiler: ${CMAKE_C_COMPILER}")

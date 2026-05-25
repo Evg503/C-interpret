@@ -247,6 +247,14 @@ int interpret_ast(ASTNode* node) {
     if (node->type == NODE_STATEMENT_LIST) {
         interpret_statement(node);
         return 0;
+    } else if (node->type == NODE_NUMBER ||
+               node->type == NODE_IDENTIFIER ||
+               node->type == NODE_UNARY_OP ||
+               node->type == NODE_BINARY_OP ||
+               node->type == NODE_TERNARY_OP ||
+               node->type == NODE_ASSIGNMENT ||
+               node->type == NODE_CALL) {
+        return interpret_expression(node);
     } else {
         interpret_statement(node);
         return 0;
