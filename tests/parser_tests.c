@@ -161,24 +161,24 @@ void test_parse_while_statement(void) {
 }
 
 // TODO: Add for statement support to parser
-// void test_parse_for_statement(void) {
-//     const char* source = "for (i = 0; i < 10; i = i + 1) { print(i); }";
-//     Lexer lexer;
-//     init_lexer(&lexer, source);
-//     Parser parser;
-//     init_parser(&parser, &lexer);
+void test_parse_for_statement(void) {
+    const char* source = "for (i = 0; i < 10; i = i + 1) { print(i); }";
+    Lexer lexer;
+    init_lexer(&lexer, source);
+    Parser parser;
+    init_parser(&parser, &lexer);
     
-//     ASTNode* program = parse_program(&parser);
-//     ASTNode* stmt = program->statement_list.statements[0];
+    ASTNode* program = parse_program(&parser);
+    ASTNode* stmt = program->statement_list.statements[0];
     
-//     TEST_ASSERT_EQUAL(NODE_FOR_STATEMENT, stmt->type);
-//     TEST_ASSERT_NOT_NULL(stmt->for_stmt.init);
-//     TEST_ASSERT_NOT_NULL(stmt->for_stmt.condition);
-//     TEST_ASSERT_NOT_NULL(stmt->for_stmt.increment);
-//     TEST_ASSERT_NOT_NULL(stmt->for_stmt.body);
+    TEST_ASSERT_EQUAL(NODE_FOR_STATEMENT, stmt->type);
+    TEST_ASSERT_NOT_NULL(stmt->for_stmt.init);
+    TEST_ASSERT_NOT_NULL(stmt->for_stmt.condition);
+    TEST_ASSERT_NOT_NULL(stmt->for_stmt.increment);
+    TEST_ASSERT_NOT_NULL(stmt->for_stmt.body);
     
-//     free_ast(program);
-// }
+    free_ast(program);
+}
 
 void test_parse_print_statement(void) {
     const char* source = "print(x + y);";
@@ -346,7 +346,7 @@ int main(void) {
     RUN_TEST(test_parse_if_statement);
     RUN_TEST(test_parse_if_else_statement);
     RUN_TEST(test_parse_while_statement);
-    // RUN_TEST(test_parse_for_statement);  // TODO: Add for statement support
+    RUN_TEST(test_parse_for_statement);  // TODO: Add for statement support
     RUN_TEST(test_parse_print_statement);
     RUN_TEST(test_parse_return_statement);
     RUN_TEST(test_parse_block_statement);
