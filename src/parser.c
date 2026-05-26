@@ -265,8 +265,6 @@ ASTNode* parse_statement(Parser* parser) {
         expect(parser, TOKEN_LPAREN, "Ожидается '(' после switch");
         node->switch_stmt.expression = parse_expression(parser);
         expect(parser, TOKEN_RPAREN, "Ожидается ')' после выражения switch");
-        expect(parser, TOKEN_LBRACE, "Ожидается '{' после switch");
-        
         node->switch_stmt.case_blocks = parse_switch_body(parser);
         
         return node;

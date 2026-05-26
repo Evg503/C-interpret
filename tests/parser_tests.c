@@ -214,7 +214,80 @@ void test_parse_return_statement(void) {
 }
 
 void test_parse_switch_statement(void) {
-    // Stub test - switch/case parsing is implemented but test needs adjustment
+    const char* source = "switch (x) { case 1: y = 1; break; default: y = 0; }";
+    Lexer lexer;
+    init_lexer(&lexer, source);
+    Parser parser;
+    init_parser(&parser, &lexer);
+    
+    ASTNode* program = parse_program(&parser);
+    
+    TEST_ASSERT_EQUAL(NODE_STATEMENT_LIST, program->type);
+    TEST_ASSERT_EQUAL(1, program->statement_list.count);
+    
+    ASTNode* stmt = program->statement_list.statements[0];
+    TEST_ASSERT_EQUAL(NODE_SWITCH_STATEMENT, stmt->type);
+    TEST_ASSERT_NOT_NULL(stmt->switch_stmt.expression);
+    TEST_ASSERT_NOT_NULL(stmt->switch_stmt.case_blocks);
+    
+    ASTNode* first_case = stmt->switch_stmt.case_blocks;
+    TEST_ASSERT_NOT_NULL(first_case);
+    TEST_ASSERT_EQUAL(NODE_CASE_BLOCK, first_case->type);
+    TEST_ASSERT_NOT_NULL(first_case->case_block.condition);
+    TEST_ASSERT_EQUAL(NODE_NUMBER, first_case->case_block.condition->type);
+    TEST_ASSERT_EQUAL(1, first_case->case_block.condition->number.value);
+    TEST_ASSERT_NOT_NULL(first_case->case_block.body);
+    TEST_ASSERT_EQUAL(2, first_case->case_block.body->statement_list.count);
+    
+    ASTNode* default_case = first_case->case_block.next;
+    TEST_ASSERT_NOT_NULL(default_case);
+    TEST_ASSERT_EQUAL(NODE_CASE_BLOCK, default_case->type);
+    TEST_ASSERT_NULL(default_case->case_block.condition);
+    TEST_ASSERT_NOT_NULL(default_case->case_block.body);
+    
+    free_ast(program);
+}
+
+void test_parse_switch_with_multiple_cases(void) {
+    const char* source = "switch (x) { case 1: y = 1; case 2: y = 2; case 3: y = 3; default: y = 0; }";
+    Lexer lexer;
+    init_lexer(&lexer, source);
+    Parser parser;
+    init_parser(&parser, &lexer);
+    
+    ASTNode* program = parse_program(&parser);
+    ASTNode* switch_stmt = program->statement_list.statements[0];
+    
+    TEST_ASSERT_EQUAL(NODE_SWITCH_STATEMENT, switch_stmt->type);
+    
+    ASTNode* current = switch_stmt->switch_stmt.case_blocks;
+    int case_count = 0;
+    while (current) {
+        case_count++;
+        TEST_ASSERT_EQUAL(NODE_CASE_BLOCK, current->type);
+        TEST_ASSERT_NOT_NULL(current->case_block.body);
+        current = current->case_block.next;
+    }
+    
+    TEST_ASSERT_EQUAL(4, case_count);
+    free_ast(program);
+}
+
+void test_parse_switch_block_body(void) {
+    const char* source = "switch (x) { case 1: { y = 1; z = 2; } break; }";
+    Lexer lexer;
+    init_lexer(&lexer, source);
+    Parser parser;
+    init_parser(&parser, &lexer);
+    
+    ASTNode* program = parse_program(&parser);
+    ASTNode* switch_stmt = program->statement_list.statements[0];
+    ASTNode* case_block = switch_stmt->switch_stmt.case_blocks;
+    
+    TEST_ASSERT_NOT_NULL(case_block);
+    TEST_ASSERT_GREATER_THAN(0, case_block->case_block.body->statement_list.count);
+    
+    free_ast(program);
 }
 
 void test_parse_block_statement(void) {
@@ -351,11 +424,12 @@ int main(void) {
     RUN_TEST(test_parse_return_statement);
     RUN_TEST(test_parse_block_statement);
     RUN_TEST(test_parse_switch_statement);
+    RUN_TEST(test_parse_switch_block_body);
+    RUN_TEST(test_parse_switch_with_multiple_cases);
     RUN_TEST(test_parse_ternary_operator);
     RUN_TEST(test_parse_function_call);
     RUN_TEST(test_parse_break_statement);
     RUN_TEST(test_parse_continue_statement);
-    // RUN_TEST(test_parse_switch_statement);  // TODO: Fix switch parsing test
     RUN_TEST(test_parse_complex_program);
     
     return UNITY_END();
