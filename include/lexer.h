@@ -62,6 +62,7 @@ typedef enum {
     TOKEN_ELSE,
     TOKEN_WHILE,
     TOKEN_FOR,
+    TOKEN_DO,
     TOKEN_RETURN,
     TOKEN_INT,
     TOKEN_CHAR,

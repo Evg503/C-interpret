@@ -56,6 +56,7 @@ static ASTNode* parse_block(Parser* parser);
 void init_parser(Parser* parser, Lexer* lexer) {
     parser->lexer = lexer;
     parser->current = get_next_token(lexer);
+    parser->has_error = 0;
 }
 
 static ASTNode* create_number_node(int value, int line, int column) {
@@ -105,7 +106,7 @@ ASTNode* parse_program(Parser* parser) {
     program->statement_list.count = 0;
     program->statement_list.capacity = 0;
     
-    while (parser->current.type != TOKEN_EOF) {
+    while (parser->current.type != TOKEN_EOF && !parser->has_error) {
         ASTNode* stmt = parse_statement(parser);
         
         if (program->statement_list.count >= program->statement_list.capacity) {
@@ -196,6 +197,55 @@ ASTNode* parse_statement(Parser* parser) {
         expect(parser, TOKEN_RPAREN, "Ожидается ')' после условия");
         
         node->while_stmt.body = parse_statement(parser);
+        
+        return node;
+    }
+    
+    // Оператор for
+    if (parser->current.type == TOKEN_FOR) {
+        int line = parser->current.line;
+        int column = parser->current.column;
+        advance(parser);
+        
+        ASTNode* node = (ASTNode*)calloc(1, sizeof(ASTNode));
+        node->type = NODE_FOR_STATEMENT;
+        node->line = line;
+        node->column = column;
+        
+        expect(parser, TOKEN_LPAREN, "Ожидается '(' после for");
+        
+        node->for_stmt.init = parse_expression(parser);
+        expect(parser, TOKEN_SEMICOLON, "Ожидается ';' в заголовке for");
+        
+        node->for_stmt.condition = parse_expression(parser);
+        expect(parser, TOKEN_SEMICOLON, "Ожидается ';' в заголовке for");
+        
+        node->for_stmt.increment = parse_expression(parser);
+        expect(parser, TOKEN_RPAREN, "Ожидается ')' после заголовка for");
+        
+        node->for_stmt.body = parse_statement(parser);
+        
+        return node;
+    }
+    
+    // Оператор do-while
+    if (parser->current.type == TOKEN_DO) {
+        int line = parser->current.line;
+        int column = parser->current.column;
+        advance(parser);
+        
+        ASTNode* node = (ASTNode*)calloc(1, sizeof(ASTNode));
+        node->type = NODE_DO_WHILE_STATEMENT;
+        node->line = line;
+        node->column = column;
+        
+        node->do_while_stmt.body = parse_statement(parser);
+        
+        expect(parser, TOKEN_WHILE, "Ожидается 'while'");
+        expect(parser, TOKEN_LPAREN, "Ожидается '(' после do-while");
+        node->do_while_stmt.condition = parse_expression(parser);
+        expect(parser, TOKEN_RPAREN, "Ожидается ')' после условия");
+        expect(parser, TOKEN_SEMICOLON, "Ожидается ';' после do-while");
         
         return node;
     }
