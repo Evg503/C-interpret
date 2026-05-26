@@ -69,7 +69,10 @@ typedef enum {
     TOKEN_VOID,
     TOKEN_PRINT,
     TOKEN_BREAK,
-    TOKEN_CONTINUE
+    TOKEN_CONTINUE,
+    TOKEN_SWITCH,
+    TOKEN_CASE,
+    TOKEN_DEFAULT
 } TokenType;
 
 // Структура токена

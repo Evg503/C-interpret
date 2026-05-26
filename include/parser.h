@@ -24,7 +24,9 @@ typedef enum {
     NODE_PRINT_STATEMENT,
     NODE_EXPRESSION_STATEMENT,
     NODE_BLOCK,
-    NODE_DO_WHILE_STATEMENT
+    NODE_DO_WHILE_STATEMENT,
+    NODE_SWITCH_STATEMENT,
+    NODE_CASE_BLOCK
 } NodeType;
 
 // Структура AST узла
@@ -103,6 +105,15 @@ typedef struct ASTNode {
         struct {
             struct ASTNode* expression;
         } print_stmt;
+        struct {
+            struct ASTNode* expression;
+            struct ASTNode* case_blocks;
+        } switch_stmt;
+        struct {
+            struct ASTNode* condition;
+            struct ASTNode* body;
+            struct ASTNode* next;
+        } case_block;
     };
 } ASTNode;
 

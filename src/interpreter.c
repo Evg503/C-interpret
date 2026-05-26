@@ -127,6 +127,43 @@ static ExecutionResult interpret_statement(ASTNode* node) {
         case NODE_CONTINUE_STATEMENT:
             return EXECUTE_CONTINUE;
             
+        case NODE_SWITCH_STATEMENT: {
+            int value = interpret_expression(node->switch_stmt.expression);
+            ASTNode* current_case = node->switch_stmt.case_blocks;
+            int matched = 0;
+            int executed = 0;
+            
+            while (current_case) {
+                if (current_case->case_block.condition == NULL) {
+                    matched = 1;
+                }
+                
+                if (interpret_expression(current_case->case_block.condition) == value) {
+                    matched = 1;
+                }
+                
+                if (matched && !executed) {
+                    executed = 1;
+                }
+                
+                if (executed) {
+                    ExecutionResult result = interpret_statement(current_case->case_block.body);
+                    if (result == EXECUTE_BREAK) {
+                        return EXECUTE_BREAK;
+                    } else if (result == EXECUTE_CONTINUE) {
+                        return EXECUTE_CONTINUE;
+                    }
+                    if (current_case->case_block.next) {
+                        executed = 0;
+                        matched = 0;
+                    }
+                }
+                
+                current_case = current_case->case_block.next;
+            }
+            break;
+        }
+            
         case NODE_STATEMENT_LIST:
             return interpret_statement_list(node);
             

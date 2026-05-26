@@ -52,6 +52,7 @@ static ASTNode* parse_unary(Parser* parser);
 static ASTNode* parse_primary(Parser* parser);
 static ASTNode* parse_statement(Parser* parser);
 static ASTNode* parse_block(Parser* parser);
+static ASTNode* parse_switch_body(Parser* parser);
 
 void init_parser(Parser* parser, Lexer* lexer) {
     parser->lexer = lexer;
@@ -250,6 +251,27 @@ ASTNode* parse_statement(Parser* parser) {
         return node;
     }
     
+    // Оператор switch
+    if (parser->current.type == TOKEN_SWITCH) {
+        int line = parser->current.line;
+        int column = parser->current.column;
+        advance(parser);
+        
+        ASTNode* node = (ASTNode*)calloc(1, sizeof(ASTNode));
+        node->type = NODE_SWITCH_STATEMENT;
+        node->line = line;
+        node->column = column;
+        
+        expect(parser, TOKEN_LPAREN, "Ожидается '(' после switch");
+        node->switch_stmt.expression = parse_expression(parser);
+        expect(parser, TOKEN_RPAREN, "Ожидается ')' после выражения switch");
+        expect(parser, TOKEN_LBRACE, "Ожидается '{' после switch");
+        
+        node->switch_stmt.case_blocks = parse_switch_body(parser);
+        
+        return node;
+    }
+    
     // Оператор return
     if (parser->current.type == TOKEN_RETURN) {
         int line = parser->current.line;
@@ -327,6 +349,103 @@ ASTNode* parse_statement(Parser* parser) {
     node->expr_stmt.expression = parse_expression(parser);
     expect(parser, TOKEN_SEMICOLON, "Ожидается ';' после выражения");
     return node;
+}
+
+// Парсинг тела switch
+static ASTNode* parse_switch_body(Parser* parser) {
+    ASTNode* case_blocks = NULL;
+    ASTNode* last_case = NULL;
+    
+    expect(parser, TOKEN_LBRACE, "Ожидается '{' после switch");
+    
+    while (!parser->has_error && parser->current.type != TOKEN_RBRACE && parser->current.type != TOKEN_EOF) {
+        if (parser->current.type == TOKEN_CASE) {
+            advance(parser);
+            
+            ASTNode* case_node = (ASTNode*)calloc(1, sizeof(ASTNode));
+            case_node->type = NODE_CASE_BLOCK;
+            case_node->line = parser->current.line;
+            case_node->column = parser->current.column;
+            
+            case_node->case_block.condition = parse_expression(parser);
+            expect(parser, TOKEN_COLON, "Ожидается ':' после case");
+            
+            ASTNode* body = (ASTNode*)calloc(1, sizeof(ASTNode));
+            body->type = NODE_STATEMENT_LIST;
+            body->statement_list.statements = NULL;
+            body->statement_list.count = 0;
+            body->statement_list.capacity = 0;
+            
+            while (!parser->has_error && parser->current.type != TOKEN_CASE 
+                   && parser->current.type != TOKEN_DEFAULT 
+                   && parser->current.type != TOKEN_RBRACE
+                   && parser->current.type != TOKEN_EOF) {
+                ASTNode* stmt = parse_statement(parser);
+                if (body->statement_list.count >= body->statement_list.capacity) {
+                    body->statement_list.capacity = body->statement_list.capacity == 0 ? 4 : body->statement_list.capacity * 2;
+                    body->statement_list.statements = (ASTNode**)realloc(
+                        body->statement_list.statements,
+                        body->statement_list.capacity * sizeof(ASTNode*)
+                    );
+                }
+                body->statement_list.statements[body->statement_list.count++] = stmt;
+            }
+            
+            case_node->case_block.body = body;
+            
+            if (case_blocks == NULL) {
+                case_blocks = case_node;
+            } else {
+                last_case->case_block.next = case_node;
+            }
+            last_case = case_node;
+        } else if (parser->current.type == TOKEN_DEFAULT) {
+            advance(parser);
+            
+            ASTNode* default_node = (ASTNode*)calloc(1, sizeof(ASTNode));
+            default_node->type = NODE_CASE_BLOCK;
+            default_node->line = parser->current.line;
+            default_node->column = parser->current.column;
+            default_node->case_block.condition = NULL;
+            
+            expect(parser, TOKEN_COLON, "Ожидается ':' после default");
+            
+            ASTNode* body = (ASTNode*)calloc(1, sizeof(ASTNode));
+            body->type = NODE_STATEMENT_LIST;
+            body->statement_list.statements = NULL;
+            body->statement_list.count = 0;
+            body->statement_list.capacity = 0;
+            
+            while (!parser->has_error && parser->current.type != TOKEN_DEFAULT 
+                   && parser->current.type != TOKEN_RBRACE
+                   && parser->current.type != TOKEN_EOF) {
+                ASTNode* stmt = parse_statement(parser);
+                if (body->statement_list.count >= body->statement_list.capacity) {
+                    body->statement_list.capacity = body->statement_list.capacity == 0 ? 4 : body->statement_list.capacity * 2;
+                    body->statement_list.statements = (ASTNode**)realloc(
+                        body->statement_list.statements,
+                        body->statement_list.capacity * sizeof(ASTNode*)
+                    );
+                }
+                body->statement_list.statements[body->statement_list.count++] = stmt;
+            }
+            
+            default_node->case_block.body = body;
+            
+            if (case_blocks == NULL) {
+                case_blocks = default_node;
+            } else {
+                last_case->case_block.next = default_node;
+            }
+            last_case = default_node;
+        } else {
+            advance(parser);
+        }
+    }
+    
+    expect(parser, TOKEN_RBRACE, "Ожидается '}' после switch");
+    
+    return case_blocks;
 }
 
 // Блок операторов
@@ -729,6 +848,15 @@ void free_ast(ASTNode* node) {
             break;
         case NODE_CONTINUE_STATEMENT:
             break;
+        case NODE_SWITCH_STATEMENT:
+            free_ast(node->switch_stmt.expression);
+            free_ast(node->switch_stmt.case_blocks);
+            break;
+        case NODE_CASE_BLOCK:
+            free_ast(node->case_block.condition);
+            free_ast(node->case_block.body);
+            free_ast(node->case_block.next);
+            break;
         default:
             break;
     }
@@ -821,6 +949,26 @@ void print_ast(ASTNode* node, int indent) {
             break;
         case NODE_CONTINUE_STATEMENT:
             printf("CONTINUE\n");
+            break;
+        case NODE_SWITCH_STATEMENT:
+            printf("SWITCH\n");
+            printf("  Expression:\n");
+            print_ast(node->switch_stmt.expression, indent + 1);
+            if (node->switch_stmt.case_blocks) {
+                printf("  Cases:\n");
+                ASTNode* current_case = node->switch_stmt.case_blocks;
+                while (current_case) {
+                    if (current_case->case_block.condition) {
+                        printf("    CASE:\n");
+                        print_ast(current_case->case_block.condition, indent + 3);
+                    } else {
+                        printf("    DEFAULT:\n");
+                    }
+                    printf("    Body:\n");
+                    print_ast(current_case->case_block.body, indent + 3);
+                    current_case = current_case->case_block.next;
+                }
+            }
             break;
         default:
             printf("UNKNOWN\n");

@@ -18,6 +18,9 @@ static Keyword keywords[] = {
     {"print", TOKEN_PRINT},
     {"break", TOKEN_BREAK},
     {"continue", TOKEN_CONTINUE},
+    {"switch", TOKEN_SWITCH},
+    {"case", TOKEN_CASE},
+    {"default", TOKEN_DEFAULT},
     {NULL, TOKEN_EOF}
 };
 
