@@ -321,11 +321,12 @@ ASTNode* parse_statement(Parser* parser) {
         return node;
     }
     
-    // Присваивание или выражение
-    ASTNode* node = parse_expression(parser);
+    // Вычисление выражения
+    ASTNode* node = (ASTNode*)calloc(1, sizeof(ASTNode));
+    node->type = NODE_EXPRESSION_STATEMENT;
+    node->expr_stmt.expression = parse_expression(parser);
     expect(parser, TOKEN_SEMICOLON, "Ожидается ';' после выражения");
     return node;
-
 }
 
 // Блок операторов

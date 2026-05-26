@@ -18,8 +18,10 @@ void test_parse_number(void) {
     TEST_ASSERT_EQUAL(1, program->statement_list.count);
     
     ASTNode* stmt = program->statement_list.statements[0];
-    TEST_ASSERT_EQUAL(NODE_NUMBER, stmt->type);
-    TEST_ASSERT_EQUAL(123, stmt->number.value);
+    TEST_ASSERT_EQUAL(NODE_EXPRESSION_STATEMENT, stmt->type);
+    ASTNode* expr = stmt->expr_stmt.expression;
+    TEST_ASSERT_EQUAL(NODE_NUMBER, expr->type);
+    TEST_ASSERT_EQUAL(123, expr->number.value);
     
     free_ast(program);
 }
@@ -72,9 +74,11 @@ void test_parse_assignment(void) {
     ASTNode* program = parse_program(&parser);
     ASTNode* stmt = program->statement_list.statements[0];
     
-    TEST_ASSERT_EQUAL(NODE_ASSIGNMENT, stmt->type);
-    TEST_ASSERT_EQUAL_STRING("x", stmt->assignment.var_name);
-    TEST_ASSERT_EQUAL(NODE_NUMBER, stmt->assignment.expression->type);
+    TEST_ASSERT_EQUAL(NODE_EXPRESSION_STATEMENT, stmt->type);
+    TEST_ASSERT_EQUAL(NODE_ASSIGNMENT, stmt->expr_stmt.expression->type);
+    ASTNode* assign = stmt->expr_stmt.expression;
+    TEST_ASSERT_EQUAL_STRING("x", assign->assignment.var_name);
+    TEST_ASSERT_EQUAL(NODE_NUMBER, assign->assignment.expression->type);
     
     free_ast(program);
 }
@@ -89,14 +93,16 @@ void test_parse_binary_expression(void) {
     ASTNode* program = parse_program(&parser);
     ASTNode* stmt = program->statement_list.statements[0];
     
-    TEST_ASSERT_EQUAL(NODE_BINARY_OP, stmt->type);
-    TEST_ASSERT_EQUAL(TOKEN_PLUS, stmt->binary.op);
+    TEST_ASSERT_EQUAL(NODE_EXPRESSION_STATEMENT, stmt->type);
+    TEST_ASSERT_EQUAL(NODE_BINARY_OP, stmt->expr_stmt.expression->type);
+    ASTNode* expr = stmt->expr_stmt.expression;
+    TEST_ASSERT_EQUAL(TOKEN_PLUS, expr->binary.op);
     
-    TEST_ASSERT_EQUAL(NODE_IDENTIFIER, stmt->binary.left->type);
-    TEST_ASSERT_EQUAL_STRING("x", stmt->binary.left->identifier.name);
+    TEST_ASSERT_EQUAL(NODE_IDENTIFIER, expr->binary.left->type);
+    TEST_ASSERT_EQUAL_STRING("x", expr->binary.left->identifier.name);
     
-    TEST_ASSERT_EQUAL(NODE_BINARY_OP, stmt->binary.right->type);
-    TEST_ASSERT_EQUAL(TOKEN_STAR, stmt->binary.right->binary.op);
+    TEST_ASSERT_EQUAL(NODE_BINARY_OP, expr->binary.right->type);
+    TEST_ASSERT_EQUAL(TOKEN_STAR, expr->binary.right->binary.op);
     
     free_ast(program);
 }
@@ -235,10 +241,12 @@ void test_parse_ternary_operator(void) {
     ASTNode* program = parse_program(&parser);
     ASTNode* stmt = program->statement_list.statements[0];
     
-    TEST_ASSERT_EQUAL(NODE_TERNARY_OP, stmt->type);
-    TEST_ASSERT_NOT_NULL(stmt->ternary.condition);
-    TEST_ASSERT_NOT_NULL(stmt->ternary.true_expr);
-    TEST_ASSERT_NOT_NULL(stmt->ternary.false_expr);
+    TEST_ASSERT_EQUAL(NODE_EXPRESSION_STATEMENT, stmt->type);
+    TEST_ASSERT_EQUAL(NODE_TERNARY_OP, stmt->expr_stmt.expression->type);
+    ASTNode* ternary = stmt->expr_stmt.expression;
+    TEST_ASSERT_NOT_NULL(ternary->ternary.condition);
+    TEST_ASSERT_NOT_NULL(ternary->ternary.true_expr);
+    TEST_ASSERT_NOT_NULL(ternary->ternary.false_expr);
     
     free_ast(program);
 }
@@ -253,9 +261,11 @@ void test_parse_function_call(void) {
     ASTNode* program = parse_program(&parser);
     ASTNode* stmt = program->statement_list.statements[0];
     
-    TEST_ASSERT_EQUAL(NODE_CALL, stmt->type);
-    TEST_ASSERT_EQUAL_STRING("max", stmt->call.func_name);
-    TEST_ASSERT_EQUAL(2, stmt->call.arg_count);
+    TEST_ASSERT_EQUAL(NODE_EXPRESSION_STATEMENT, stmt->type);
+    TEST_ASSERT_EQUAL(NODE_CALL, stmt->expr_stmt.expression->type);
+    ASTNode* call = stmt->expr_stmt.expression;
+    TEST_ASSERT_EQUAL_STRING("max", call->call.func_name);
+    TEST_ASSERT_EQUAL(2, call->call.arg_count);
     
     free_ast(program);
 }

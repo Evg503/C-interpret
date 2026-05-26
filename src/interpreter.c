@@ -130,6 +130,10 @@ static ExecutionResult interpret_statement(ASTNode* node) {
         case NODE_STATEMENT_LIST:
             return interpret_statement_list(node);
             
+        case NODE_EXPRESSION_STATEMENT:
+            interpret_expression(node->expr_stmt.expression);
+            break;
+            
         default:
             interpret_expression(node);
             break;
@@ -245,8 +249,25 @@ int interpret_ast(ASTNode* node) {
     if (!node) return 0;
     
     if (node->type == NODE_STATEMENT_LIST) {
+        if (node->statement_list.count == 1 && 
+            node->statement_list.statements[0]->type == NODE_EXPRESSION_STATEMENT) {
+            return interpret_expression(node->statement_list.statements[0]->expr_stmt.expression);
+        }
         interpret_statement(node);
         return 0;
+    } else if (node->type == NODE_VARIABLE_DECL ||
+               node->type == NODE_IF_STATEMENT ||
+               node->type == NODE_WHILE_STATEMENT ||
+               node->type == NODE_FOR_STATEMENT ||
+               node->type == NODE_DO_WHILE_STATEMENT ||
+               node->type == NODE_RETURN_STATEMENT ||
+               node->type == NODE_BREAK_STATEMENT ||
+               node->type == NODE_CONTINUE_STATEMENT ||
+               node->type == NODE_PRINT_STATEMENT) {
+        interpret_statement(node);
+        return 0;
+    } else if (node->type == NODE_EXPRESSION_STATEMENT) {
+        return interpret_expression(node->expr_stmt.expression);
     } else if (node->type == NODE_NUMBER ||
                node->type == NODE_IDENTIFIER ||
                node->type == NODE_UNARY_OP ||
@@ -256,7 +277,6 @@ int interpret_ast(ASTNode* node) {
                node->type == NODE_CALL) {
         return interpret_expression(node);
     } else {
-        interpret_statement(node);
         return 0;
     }
 }

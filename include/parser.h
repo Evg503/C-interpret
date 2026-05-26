@@ -22,6 +22,7 @@ typedef enum {
     NODE_BREAK_STATEMENT,
     NODE_CONTINUE_STATEMENT,
     NODE_PRINT_STATEMENT,
+    NODE_EXPRESSION_STATEMENT,
     NODE_BLOCK,
     NODE_DO_WHILE_STATEMENT
 } NodeType;
@@ -96,6 +97,9 @@ typedef struct ASTNode {
         struct {
             struct ASTNode* expression;
         } return_stmt;
+        struct {
+            struct ASTNode* expression;
+        } expr_stmt;
         struct {
             struct ASTNode* expression;
         } print_stmt;
